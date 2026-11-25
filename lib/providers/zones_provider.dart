@@ -38,8 +38,10 @@ class ZonesProvider extends ChangeNotifier {
         .toList();
   }
 
+  // Une clé différente pour chaque utilisateur
   String _cle(String uid) => 'zones_$uid';
 
+  // Lecture des zones sauvegardées
   List<Zone> _lire(String uid) {
     final texte = _prefs.getString(_cle(uid));
     if (texte == null) {
@@ -59,6 +61,7 @@ class ZonesProvider extends ChangeNotifier {
     }
   }
 
+  // Sauvegarde des zones
   Future<void> _sauvegarder() async {
     final currentUid = _uid;
     if (currentUid == null || currentUid.isEmpty) return;
@@ -69,6 +72,7 @@ class ZonesProvider extends ChangeNotifier {
     await _prefs.setString(_cle(currentUid), texte);
   }
 
+  // Actualisation lors du changement de compte
   bool _actualiser() {
     final nouveauUid = _auth.utilisateur?.uid;
     if (nouveauUid == _uid) return false;
@@ -89,6 +93,19 @@ class ZonesProvider extends ChangeNotifier {
     }
   }
 
+  // Ouvrir ou fermer la vanne d'une zone
+  bool basculerVanne(Zone zone, [bool? etatForce]) {
+    if (!estConnecte) return false;
+    final index = _zones.indexOf(zone);
+    if (index == -1) return false;
+
+    _zones[index].vanneOuverte = etatForce ?? !_zones[index].vanneOuverte;
+    _sauvegarder();
+    notifyListeners();
+    return true;
+  }
+
+  // Modifier l'humidité et enregistrer dans l'historique
   bool modifierHumidite(Zone zone, double delta) {
     if (!estConnecte) return false;
     final index = _zones.indexOf(zone);
@@ -96,33 +113,53 @@ class ZonesProvider extends ChangeNotifier {
 
     final nouvelleHumidite =
     (_zones[index].humidite + delta).clamp(0.0, 100.0).toDouble();
-    _zones[index].humidite = nouvelleHumidite;
+    final signe =
+    delta >= 0 ? '+${delta.toStringAsFixed(0)}%' : '${delta.toStringAsFixed(0)}%';
+    _zones[index].enregistrerMesure(
+      nouvelleHumidite,
+      source: 'Ajustement ($signe)',
+    );
 
     _sauvegarder();
     notifyListeners();
     return true;
   }
 
+  // Ajouter une zone
   bool ajouter(Zone zone) {
     if (!estConnecte) return false;
 
+    if (zone.historique.isEmpty) {
+      zone.enregistrerMesure(zone.humidite, source: 'Initiale');
+    }
     _zones.add(zone);
     _sauvegarder();
     notifyListeners();
     return true;
   }
 
+  // Remplacer une zone en conservant l'historique
   bool remplacer(Zone ancienne, Zone nouvelle) {
     if (!estConnecte) return false;
     final index = _zones.indexOf(ancienne);
     if (index == -1) return false;
 
-    _zones[index] = nouvelle;
+    final historiqueFusionne = <MesureHumidite>[
+      ...ancienne.historique,
+      if ((nouvelle.humidite - ancienne.humidite).abs() > 0.001)
+        MesureHumidite(
+          humidite: nouvelle.humidite,
+          source: 'Modification zone',
+        ),
+    ];
+
+    _zones[index] = nouvelle.copyWith(historique: historiqueFusionne);
     _sauvegarder();
     notifyListeners();
     return true;
   }
 
+  // Supprimer une zone
   bool supprimer(Zone zone) {
     if (!estConnecte) return false;
     final supprimee = _zones.remove(zone);

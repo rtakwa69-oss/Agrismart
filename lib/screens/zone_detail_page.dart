@@ -15,6 +15,14 @@ class ZoneDetailPage extends StatelessWidget {
     this.nomsAutres = const [],
   });
 
+  String _formaterDate(DateTime d) {
+    final jour = d.day.toString().padLeft(2, '0');
+    final mois = d.month.toString().padLeft(2, '0');
+    final heure = d.hour.toString().padLeft(2, '0');
+    final min = d.minute.toString().padLeft(2, '0');
+    return '$jour/$mois/${d.year} à $heure:$min';
+  }
+
   Future<void> _modifier(BuildContext context) async {
     final nouvelleZone = await Navigator.push<Zone>(
       context,
@@ -33,7 +41,8 @@ class ZoneDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final estAutorise = context.watch<ZonesProvider>().contientZone(zone);
+    final provider = context.watch<ZonesProvider>();
+    final estAutorise = provider.contientZone(zone);
     if (!estAutorise) {
       return Scaffold(
         appBar: AppBar(title: const Text('Accès refusé')),
@@ -47,6 +56,7 @@ class ZoneDetailPage extends StatelessWidget {
     zone.besoinIrrigation ? AppTheme.echec : AppTheme.succes;
     final longueur = zone.culture.length < 4 ? zone.culture.length : 4;
     final texte = Theme.of(context).textTheme;
+    final mesuresRecentes = zone.historique.reversed.toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -118,17 +128,49 @@ class ZoneDetailPage extends StatelessWidget {
                   ),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: Icon(
-                    zone.vanneOuverte
-                        ? Icons.toggle_on
-                        : Icons.toggle_off,
+                SwitchListTile(
+                  secondary: Icon(
+                    zone.vanneOuverte ? Icons.toggle_on : Icons.toggle_off,
                   ),
                   title: const Text('Vanne'),
-                  trailing: Text(
+                  subtitle: Text(
                     zone.vanneOuverte ? 'Ouverte' : 'Fermée',
                   ),
+                  value: zone.vanneOuverte,
+                  onChanged: (valeur) {
+                    provider.basculerVanne(zone, valeur);
+                  },
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Historique des mesures', style: texte.titleMedium),
+          const SizedBox(height: 8),
+          Card(
+            child: mesuresRecentes.isEmpty
+                ? const ListTile(
+              title: Text('Aucune mesure enregistrée'),
+            )
+                : Column(
+              children: [
+                for (var i = 0; i < mesuresRecentes.length; i++) ...[
+                  ListTile(
+                    leading: const Icon(Icons.history),
+                    title: Text(
+                      '${mesuresRecentes[i].humidite.toStringAsFixed(0)} %',
+                    ),
+                    subtitle: Text(
+                      mesuresRecentes[i].source ?? 'Mesure',
+                    ),
+                    trailing: Text(
+                      _formaterDate(mesuresRecentes[i].date),
+                      style: texte.bodySmall,
+                    ),
+                  ),
+                  if (i < mesuresRecentes.length - 1)
+                    const Divider(height: 1),
+                ],
               ],
             ),
           ),
