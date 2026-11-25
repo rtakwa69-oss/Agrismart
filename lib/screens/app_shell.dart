@@ -1,7 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
+import 'package:agrismart/screens/assistant_page.dart';
 import 'package:agrismart/screens/profil_page.dart';
 import 'package:agrismart/screens/statistiques_page.dart';
 import 'package:agrismart/screens/zones_page.dart';
@@ -28,10 +28,10 @@ class _AppShellState extends State<AppShell> {
         children: const [
           ZonesPage(),
           StatistiquesPage(),
+          AssistantPage(),
           ProfilPage(),
         ],
       ),
-
       bottomNavigationBar: NavigationBar(
         selectedIndex: _onglet,
         onDestinationSelected: (index) {
@@ -53,13 +53,16 @@ class _AppShellState extends State<AppShell> {
             ),
             label: 'Zones',
           ),
-
           const NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: 'Statistiques',
           ),
-
+          const NavigationDestination(
+            icon: Icon(Icons.smart_toy_outlined),
+            selectedIcon: Icon(Icons.smart_toy),
+            label: 'Assistant',
+          ),
           const NavigationDestination(
             icon: Icon(Icons.info_outline),
             selectedIcon: Icon(Icons.info),

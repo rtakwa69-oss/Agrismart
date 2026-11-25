@@ -13,10 +13,24 @@ class Zone {
         this.vanneOuverte = false,
       });
 
-  // Vrai si l'humidité est sous le seuil
   bool get besoinIrrigation => humidite < seuil;
 
-  // Conversion de Zone vers JSON
+  Zone copyWith({
+    String? nom,
+    String? culture,
+    double? humidite,
+    double? seuil,
+    bool? vanneOuverte,
+  }) {
+    return Zone(
+      nom ?? this.nom,
+      culture ?? this.culture,
+      humidite ?? this.humidite,
+      seuil ?? this.seuil,
+      vanneOuverte: vanneOuverte ?? this.vanneOuverte,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'nom': nom,
@@ -27,7 +41,6 @@ class Zone {
     };
   }
 
-  // Reconstruction d'une Zone depuis JSON
   factory Zone.fromJson(Map<String, dynamic> json) {
     return Zone(
       json['nom'] as String,
@@ -39,12 +52,10 @@ class Zone {
   }
 }
 
-// Humidité moyenne d'une liste de zones (0 si vide)
 double humiditeMoyenne(List<Zone> zones) {
   if (zones.isEmpty) return 0;
 
   double somme = 0;
-
   for (final z in zones) {
     somme += z.humidite;
   }
@@ -52,11 +63,9 @@ double humiditeMoyenne(List<Zone> zones) {
   return somme / zones.length;
 }
 
-// Message de diagnostic pour une zone
 String diagnostic(Zone zone) {
   if (zone.besoinIrrigation) {
     return "Besoin d'irrigation";
   }
-
   return 'Sol correct';
 }

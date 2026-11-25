@@ -1,6 +1,7 @@
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:agrismart/models/zone.dart';
+import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/screens/zone_form_page.dart';
 import 'package:agrismart/theme/app_theme.dart';
 
@@ -32,12 +33,19 @@ class ZoneDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final estAutorise = context.watch<ZonesProvider>().contientZone(zone);
+    if (!estAutorise) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Accès refusé')),
+        body: const Center(
+          child: Text('Cette zone n’appartient pas au compte actif.'),
+        ),
+      );
+    }
+
     final couleur =
     zone.besoinIrrigation ? AppTheme.echec : AppTheme.succes;
-
-    final longueur =
-    zone.culture.length < 4 ? zone.culture.length : 4;
-
+    final longueur = zone.culture.length < 4 ? zone.culture.length : 4;
     final texte = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -76,7 +84,7 @@ class ZoneDetailPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           LinearProgressIndicator(
-            value: zone.humidite / 100,
+            value: (zone.humidite / 100).clamp(0.0, 1.0),
             color: couleur,
             minHeight: 10,
           ),

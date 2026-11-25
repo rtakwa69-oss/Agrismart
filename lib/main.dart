@@ -1,4 +1,3 @@
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agrismart/config.dart';
 import 'package:agrismart/firebase_options.dart';
 
+import 'package:agrismart/providers/assistant_provider.dart';
 import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
@@ -14,6 +14,7 @@ import 'package:agrismart/providers/reglages_provider.dart';
 
 import 'package:agrismart/screens/auth_gate.dart';
 
+import 'package:agrismart/services/assistant_service.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
 import 'package:agrismart/services/auth_service.dart';
 import 'package:agrismart/services/firebase_auth_service.dart';
@@ -52,6 +53,15 @@ Future<void> main() async {
           create: (context) => ZonesProvider(
             prefs,
             context.read<AuthProvider>(),
+          ),
+        ),
+
+        // Assistant IA lié à l'utilisateur et à ses zones
+        ChangeNotifierProvider(
+          create: (context) => AssistantProvider(
+            AssistantService(),
+            context.read<AuthProvider>(),
+            context.read<ZonesProvider>(),
           ),
         ),
 

@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -13,7 +12,6 @@ class ZonesProvider extends ChangeNotifier {
   final AuthProvider _auth;
 
   final List<Zone> _zones = [];
-
   String? _uid;
 
   ZonesProvider(this._prefs, this._auth) {
@@ -21,34 +19,35 @@ class ZonesProvider extends ChangeNotifier {
     _actualiser();
   }
 
-  List<Zone> get zones => List.unmodifiable(_zones);
+  String? get uid => _uid;
+  bool get estConnecte => _uid != null && _uid!.isNotEmpty;
 
-  int get nombre => _zones.length;
+  List<Zone> get zones => estConnecte ? List.unmodifiable(_zones) : const [];
+
+  int get nombre => zones.length;
 
   int get nombreAIrriguer =>
-      _zones.where((zone) => zone.besoinIrrigation).length;
+      zones.where((zone) => zone.besoinIrrigation).length;
+
+  bool contientZone(Zone zone) => estConnecte && _zones.contains(zone);
 
   List<String> noms({Zone? sauf}) {
-    return _zones
+    return zones
         .where((zone) => zone != sauf)
         .map((zone) => zone.nom)
         .toList();
   }
 
-  // Une clé différente pour chaque utilisateur
   String _cle(String uid) => 'zones_$uid';
 
-  // Lecture des zones sauvegardées
   List<Zone> _lire(String uid) {
     final texte = _prefs.getString(_cle(uid));
-
     if (texte == null) {
       return jeuDeDonnees();
     }
 
     try {
       final liste = jsonDecode(texte) as List<dynamic>;
-
       return liste.map((element) {
         return Zone.fromJson(
           Map<String, dynamic>.from(element as Map),
@@ -60,30 +59,25 @@ class ZonesProvider extends ChangeNotifier {
     }
   }
 
-  // Sauvegarde des zones
   Future<void> _sauvegarder() async {
-    final uid = _uid;
-
-    if (uid == null) return;
+    final currentUid = _uid;
+    if (currentUid == null || currentUid.isEmpty) return;
 
     final texte = jsonEncode(
       _zones.map((zone) => zone.toJson()).toList(),
     );
-
-    await _prefs.setString(_cle(uid), texte);
+    await _prefs.setString(_cle(currentUid), texte);
   }
 
-  // Actualisation lors du changement de compte
   bool _actualiser() {
-    final uid = _auth.utilisateur?.uid;
+    final nouveauUid = _auth.utilisateur?.uid;
+    if (nouveauUid == _uid) return false;
 
-    if (uid == _uid) return false;
-
-    _uid = uid;
+    _uid = nouveauUid;
     _zones.clear();
 
-    if (uid != null) {
-      _zones.addAll(_lire(uid));
+    if (nouveauUid != null && nouveauUid.isNotEmpty) {
+      _zones.addAll(_lire(nouveauUid));
     }
 
     return true;
@@ -95,41 +89,48 @@ class ZonesProvider extends ChangeNotifier {
     }
   }
 
-  // Modifier l'humidité
-  void modifierHumidite(Zone zone, double delta) {
-    zone.humidite =
-        (zone.humidite + delta).clamp(0.0, 100.0).toDouble();
+  bool modifierHumidite(Zone zone, double delta) {
+    if (!estConnecte) return false;
+    final index = _zones.indexOf(zone);
+    if (index == -1) return false;
+
+    final nouvelleHumidite =
+    (_zones[index].humidite + delta).clamp(0.0, 100.0).toDouble();
+    _zones[index].humidite = nouvelleHumidite;
 
     _sauvegarder();
     notifyListeners();
+    return true;
   }
 
-  // Ajouter une zone
-  void ajouter(Zone zone) {
+  bool ajouter(Zone zone) {
+    if (!estConnecte) return false;
+
     _zones.add(zone);
-
     _sauvegarder();
     notifyListeners();
+    return true;
   }
 
-  // Remplacer une zone
-  void remplacer(Zone ancienne, Zone nouvelle) {
+  bool remplacer(Zone ancienne, Zone nouvelle) {
+    if (!estConnecte) return false;
     final index = _zones.indexOf(ancienne);
-
-    if (index == -1) return;
+    if (index == -1) return false;
 
     _zones[index] = nouvelle;
-
     _sauvegarder();
     notifyListeners();
+    return true;
   }
 
-  // Supprimer une zone
-  void supprimer(Zone zone) {
-    _zones.remove(zone);
+  bool supprimer(Zone zone) {
+    if (!estConnecte) return false;
+    final supprimee = _zones.remove(zone);
+    if (!supprimee) return false;
 
     _sauvegarder();
     notifyListeners();
+    return true;
   }
 
   @override
