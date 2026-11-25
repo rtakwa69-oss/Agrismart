@@ -15,12 +15,114 @@ class ZoneDetailPage extends StatelessWidget {
     this.nomsAutres = const [],
   });
 
+  String _deuxChiffres(int n) => n.toString().padLeft(2, '0');
+
   String _formaterDate(DateTime d) {
-    final jour = d.day.toString().padLeft(2, '0');
-    final mois = d.month.toString().padLeft(2, '0');
-    final heure = d.hour.toString().padLeft(2, '0');
-    final min = d.minute.toString().padLeft(2, '0');
-    return '$jour/$mois/${d.year} à $heure:$min';
+    return '${_deuxChiffres(d.day)}/${_deuxChiffres(d.month)}/${d.year} à ${_deuxChiffres(d.hour)}:${_deuxChiffres(d.minute)}';
+  }
+
+  String _formaterHeure(DateTime d) {
+    return '${_deuxChiffres(d.hour)}:${_deuxChiffres(d.minute)}';
+  }
+
+  String _formaterDuree(Duration d) {
+    final totalSecondes = d.inSeconds < 0 ? 0 : d.inSeconds;
+    final heures = totalSecondes ~/ 3600;
+    final minutes = (totalSecondes % 3600) ~/ 60;
+    final secondes = totalSecondes % 60;
+
+    if (heures > 0) {
+      return '${heures}h ${_deuxChiffres(minutes)}min';
+    }
+    if (minutes > 0) {
+      return '${minutes}min ${_deuxChiffres(secondes)}s';
+    }
+    return '${secondes}s';
+  }
+
+  Future<void> _choisirDureeEtOuvrir(BuildContext context) async {
+    final provider = context.read<ZonesProvider>();
+    Duration? dureeChoisie;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Programmer l\'ouverture de la vanne'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Choisissez une durée ou une heure de fermeture :'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ActionChip(
+                  label: const Text('15 min'),
+                  onPressed: () {
+                    dureeChoisie = const Duration(minutes: 15);
+                    Navigator.pop(dialogContext);
+                  },
+                ),
+                ActionChip(
+                  label: const Text('30 min'),
+                  onPressed: () {
+                    dureeChoisie = const Duration(minutes: 30);
+                    Navigator.pop(dialogContext);
+                  },
+                ),
+                ActionChip(
+                  label: const Text('1 heure'),
+                  onPressed: () {
+                    dureeChoisie = const Duration(hours: 1);
+                    Navigator.pop(dialogContext);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.schedule),
+              label: const Text('Choisir l\'heure de fermeture'),
+              onPressed: () async {
+                final maintenant = DateTime.now();
+                final heureSelectionnee = await showTimePicker(
+                  context: dialogContext,
+                  initialTime: TimeOfDay.fromDateTime(
+                    maintenant.add(const Duration(minutes: 30)),
+                  ),
+                );
+                if (heureSelectionnee == null || !dialogContext.mounted) return;
+
+                var cible = DateTime(
+                  maintenant.year,
+                  maintenant.month,
+                  maintenant.day,
+                  heureSelectionnee.hour,
+                  heureSelectionnee.minute,
+                );
+                if (!cible.isAfter(maintenant)) {
+                  cible = cible.add(const Duration(days: 1));
+                }
+
+                dureeChoisie = cible.difference(maintenant);
+                Navigator.pop(dialogContext);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+        ],
+      ),
+    );
+
+    if (dureeChoisie == null || !context.mounted) return;
+    provider.ouvrirIrrigation(zone, dureeChoisie!);
   }
 
   Future<void> _modifier(BuildContext context) async {
@@ -57,6 +159,7 @@ class ZoneDetailPage extends StatelessWidget {
     final longueur = zone.culture.length < 4 ? zone.culture.length : 4;
     final texte = Theme.of(context).textTheme;
     final mesuresRecentes = zone.historique.reversed.toList();
+    final sessionsRecentes = zone.historiqueIrrigation.reversed.toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -134,13 +237,64 @@ class ZoneDetailPage extends StatelessWidget {
                   ),
                   title: const Text('Vanne'),
                   subtitle: Text(
-                    zone.vanneOuverte ? 'Ouverte' : 'Fermée',
+                    zone.vanneOuverte && zone.finPrevueIrrigation != null
+                        ? 'Ouverte • Fermeture prévue à ${_formaterHeure(zone.finPrevueIrrigation!)}'
+                        : (zone.vanneOuverte ? 'Ouverte' : 'Fermée'),
                   ),
                   value: zone.vanneOuverte,
                   onChanged: (valeur) {
-                    provider.basculerVanne(zone, valeur);
+                    if (valeur) {
+                      _choisirDureeEtOuvrir(context);
+                    } else {
+                      provider.fermerIrrigation(zone);
+                    }
                   },
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (!zone.vanneOuverte)
+            FilledButton.tonalIcon(
+              onPressed: () => _choisirDureeEtOuvrir(context),
+              icon: const Icon(Icons.timer),
+              label: const Text('Programmer durée / heure de fermeture'),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () => provider.fermerIrrigation(zone),
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text('Fermer la vanne maintenant'),
+            ),
+          const SizedBox(height: 20),
+          Text('Historique d\'irrigation', style: texte.titleMedium),
+          const SizedBox(height: 8),
+          Card(
+            child: sessionsRecentes.isEmpty
+                ? const ListTile(
+              title: Text('Aucune session d\'irrigation enregistrée'),
+            )
+                : Column(
+              children: [
+                for (var i = 0; i < sessionsRecentes.length; i++) ...[
+                  ListTile(
+                    leading: Icon(
+                      sessionsRecentes[i].estEnCours
+                          ? Icons.timelapse
+                          : Icons.check_circle_outline,
+                    ),
+                    title: Text(
+                      sessionsRecentes[i].estEnCours
+                          ? 'Ouverte à ${_formaterHeure(sessionsRecentes[i].debut)} • Durée : ${_formaterDuree(sessionsRecentes[i].dureeReelle)}'
+                          : 'De ${_formaterHeure(sessionsRecentes[i].debut)} à ${_formaterHeure(sessionsRecentes[i].fin!)} • Restée ouverte : ${_formaterDuree(sessionsRecentes[i].dureeReelle)}',
+                    ),
+                    subtitle: Text(
+                      '${sessionsRecentes[i].motifFermeture} (prévu : ${_formaterDuree(sessionsRecentes[i].dureePrevue)})',
+                    ),
+                  ),
+                  if (i < sessionsRecentes.length - 1)
+                    const Divider(height: 1),
+                ],
               ],
             ),
           ),

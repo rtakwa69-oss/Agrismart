@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -13,10 +14,12 @@ class ZonesProvider extends ChangeNotifier {
 
   final List<Zone> _zones = [];
   String? _uid;
+  Timer? _minuteur;
 
   ZonesProvider(this._prefs, this._auth) {
     _auth.addListener(_surChangementUtilisateur);
     _actualiser();
+    _demarrerMinuteur();
   }
 
   String? get uid => _uid;
@@ -40,6 +43,37 @@ class ZonesProvider extends ChangeNotifier {
 
   // Une clé différente pour chaque utilisateur
   String _cle(String uid) => 'zones_$uid';
+
+  void _demarrerMinuteur() {
+    _minuteur?.cancel();
+    _minuteur = Timer.periodic(const Duration(seconds: 1), (_) {
+      verifierEcheancesIrrigation();
+    });
+  }
+
+  void verifierEcheancesIrrigation() {
+    if (!estConnecte) return;
+    final maintenant = DateTime.now();
+    var modifie = false;
+
+    for (final zone in _zones) {
+      final finPrevue = zone.finPrevueIrrigation;
+      if (zone.vanneOuverte &&
+          finPrevue != null &&
+          !maintenant.isBefore(finPrevue)) {
+        zone.fermerVanne(
+          dateFin: finPrevue,
+          motif: 'Automatique (minuteur)',
+        );
+        modifie = true;
+      }
+    }
+
+    if (modifie) {
+      _sauvegarder();
+      notifyListeners();
+    }
+  }
 
   // Lecture des zones sauvegardées
   List<Zone> _lire(String uid) {
@@ -82,6 +116,7 @@ class ZonesProvider extends ChangeNotifier {
 
     if (nouveauUid != null && nouveauUid.isNotEmpty) {
       _zones.addAll(_lire(nouveauUid));
+      verifierEcheancesIrrigation();
     }
 
     return true;
@@ -93,13 +128,40 @@ class ZonesProvider extends ChangeNotifier {
     }
   }
 
+  bool ouvrirIrrigation(Zone zone, Duration duree) {
+    if (!estConnecte) return false;
+    final index = _zones.indexOf(zone);
+    if (index == -1) return false;
+
+    _zones[index].ouvrirVanneAvecDuree(duree);
+    _sauvegarder();
+    notifyListeners();
+    return true;
+  }
+
+  bool fermerIrrigation(Zone zone) {
+    if (!estConnecte) return false;
+    final index = _zones.indexOf(zone);
+    if (index == -1) return false;
+
+    _zones[index].fermerVanne(motif: 'Fermée manuellement');
+    _sauvegarder();
+    notifyListeners();
+    return true;
+  }
+
   // Ouvrir ou fermer la vanne d'une zone
   bool basculerVanne(Zone zone, [bool? etatForce]) {
     if (!estConnecte) return false;
     final index = _zones.indexOf(zone);
     if (index == -1) return false;
 
-    _zones[index].vanneOuverte = etatForce ?? !_zones[index].vanneOuverte;
+    final cible = etatForce ?? !_zones[index].vanneOuverte;
+    if (cible) {
+      _zones[index].ouvrirVanneAvecDuree(const Duration(minutes: 30));
+    } else {
+      _zones[index].fermerVanne(motif: 'Fermée manuellement');
+    }
     _sauvegarder();
     notifyListeners();
     return true;
@@ -153,7 +215,10 @@ class ZonesProvider extends ChangeNotifier {
         ),
     ];
 
-    _zones[index] = nouvelle.copyWith(historique: historiqueFusionne);
+    _zones[index] = nouvelle.copyWith(
+      historique: historiqueFusionne,
+      historiqueIrrigation: ancienne.historiqueIrrigation,
+    );
     _sauvegarder();
     notifyListeners();
     return true;
@@ -172,6 +237,7 @@ class ZonesProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _minuteur?.cancel();
     _auth.removeListener(_surChangementUtilisateur);
     super.dispose();
   }
