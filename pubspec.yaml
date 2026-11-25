@@ -1,3 +1,4 @@
+
 name: agrismart
 description: "Agrismart Application"
 
@@ -33,6 +34,9 @@ dependencies:
 
   # Charts
   fl_chart: ^0.68.0
+
+  # Notifications locales
+  flutter_local_notifications: 19.5.0
 
 dev_dependencies:
   flutter_test:

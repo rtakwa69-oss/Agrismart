@@ -1,10 +1,15 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:agrismart/providers/zones_provider.dart';
+import 'package:agrismart/providers/alerte_provider.dart';
+
 import 'package:agrismart/screens/assistant_page.dart';
 import 'package:agrismart/screens/profil_page.dart';
 import 'package:agrismart/screens/statistiques_page.dart';
 import 'package:agrismart/screens/zones_page.dart';
+import 'package:agrismart/screens/alertes_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -22,6 +27,10 @@ class _AppShellState extends State<AppShell> {
           (provider) => provider.nombreAIrriguer,
     );
 
+    final alertesNonLues = context.select<AlerteProvider, int>(
+          (provider) => provider.nombreNonLues,
+    );
+
     return Scaffold(
       body: IndexedStack(
         index: _onglet,
@@ -30,8 +39,10 @@ class _AppShellState extends State<AppShell> {
           StatistiquesPage(),
           AssistantPage(),
           ProfilPage(),
+          AlertesPage(),
         ],
       ),
+
       bottomNavigationBar: NavigationBar(
         selectedIndex: _onglet,
         onDestinationSelected: (index) {
@@ -53,20 +64,37 @@ class _AppShellState extends State<AppShell> {
             ),
             label: 'Zones',
           ),
+
           const NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: 'Statistiques',
           ),
+
           const NavigationDestination(
             icon: Icon(Icons.smart_toy_outlined),
             selectedIcon: Icon(Icons.smart_toy),
             label: 'Assistant',
           ),
+
           const NavigationDestination(
             icon: Icon(Icons.info_outline),
             selectedIcon: Icon(Icons.info),
             label: 'Profil',
+          ),
+
+          NavigationDestination(
+            icon: Badge(
+              label: Text('$alertesNonLues'),
+              isLabelVisible: alertesNonLues > 0,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            selectedIcon: Badge(
+              label: Text('$alertesNonLues'),
+              isLabelVisible: alertesNonLues > 0,
+              child: const Icon(Icons.notifications),
+            ),
+            label: 'Alertes',
           ),
         ],
       ),

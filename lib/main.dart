@@ -1,3 +1,4 @@
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ import 'package:agrismart/providers/auth_provider.dart';
 import 'package:agrismart/providers/meteo_provider.dart';
 import 'package:agrismart/providers/zones_provider.dart';
 import 'package:agrismart/providers/reglages_provider.dart';
+import 'package:agrismart/providers/alerte_provider.dart';
 
 import 'package:agrismart/screens/auth_gate.dart';
 
@@ -18,6 +20,7 @@ import 'package:agrismart/services/assistant_service.dart';
 import 'package:agrismart/services/auth_locale_service.dart';
 import 'package:agrismart/services/auth_service.dart';
 import 'package:agrismart/services/firebase_auth_service.dart';
+import 'package:agrismart/services/notification_service.dart';
 
 import 'package:agrismart/theme/app_theme.dart';
 
@@ -73,6 +76,15 @@ Future<void> main() async {
         // Gestion météo et cache local
         ChangeNotifierProvider(
           create: (_) => MeteoProvider(prefs)..charger(),
+        ),
+
+        // Gestion des alertes et notifications
+        ChangeNotifierProvider(
+          create: (context) => AlerteProvider(
+            context.read<ZonesProvider>(),
+            context.read<MeteoProvider>(),
+            NotificationService(),
+          ),
         ),
       ],
       child: const AgriSmartApp(),
